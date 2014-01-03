@@ -37,6 +37,7 @@ MBTiles provider parameters:
 """
 from urlparse import urlparse, urljoin
 from os.path import exists
+from string import Template
 
 # Heroku is missing standard python's sqlite3 package, so this will ImportError.
 from sqlite3 import connect as _connect
@@ -145,12 +146,22 @@ def list_tiles(filename):
     
     return tiles
 
-def get_tile(filename, coord):
+def get_tile(filename, coord, layer_path_matches = None):
     """ Retrieve the mime-type and raw content of a tile by coordinate.
     
         If the tile does not exist, None is returned for the content.
     """
-    db = _connect(filename)
+    db = None
+    if layer_path_matches:
+        if tileset_exists(Template(filename).substitute(layer_path_matches)):
+            db = _connect(Template(filename).substitute(layer_path_matches))
+    else:
+        if tileset_exists(filename):
+            db = _connect(filename)
+
+    if not db:
+        return None, None
+
     db.text_factory = bytes
     
     formats = {'png': 'image/png', 'jpg': 'image/jpeg', 'json': 'application/json', None: None}
@@ -211,10 +222,13 @@ class Provider:
         """
         return {'tileset': config_dict['tileset']}
     
-    def renderTile(self, width, height, srs, coord):
+    def renderTile(self, width, height, srs, coord, layer_path_matches = None):
         """ Retrieve a single tile, return a TileResponse instance.
         """
-        mime_type, content = get_tile(self.tileset, coord)
+        if layer_path_matches:
+            mime_type, content = get_tile(self.tileset, coord, layer_path_matches)
+        else:
+            mime_type, content = get_tile(self.tileset, coord)
         formats = {'image/png': 'PNG', 'image/jpeg': 'JPEG', 'application/json': 'JSON', None: None}
         return TileResponse(formats[mime_type], content)
 

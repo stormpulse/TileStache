@@ -150,10 +150,10 @@ from ModestMaps.Core import Coordinate
 
 _recent_tiles = dict(hash={}, list=[])
 
-def _addRecentTile(layer, coord, format, body, age=300):
+def _addRecentTile(layer, coord, format, body, age=300, layername = None):
     """ Add the body of a tile to _recent_tiles with a timeout.
     """
-    key = (layer, coord, format)
+    key = (layer, coord, format, layername)
     due = time() + age
     
     _recent_tiles['hash'][key] = body, due
@@ -179,10 +179,10 @@ def _addRecentTile(layer, coord, format, body, age=300):
         except KeyError:
             pass
 
-def _getRecentTile(layer, coord, format):
+def _getRecentTile(layer, coord, format, layername = None):
     """ Return the body of a recent tile, or None if it's not there.
     """
-    key = (layer, coord, format)
+    key = (layer, coord, format, layername)
     body, use_by = _recent_tiles['hash'].get(key, (None, 0))
     
     # non-existent?
@@ -347,7 +347,7 @@ class Layer:
 
         return None
 
-    def getTileResponse(self, coord, extension, ignore_cached=False):
+    def getTileResponse(self, coord, extension, ignore_cached=False, layername = None, layer_path_matches = None):
         """ Get status code, headers, and a tile binary for a given request layer tile.
         
             Arguments:
@@ -372,7 +372,7 @@ class Layer:
         if not ignore_cached:
             # Start by checking for a tile in the cache.
             try:
-                body = cache.read(self, coord, format)
+                body = cache.read(self, coord, format, layername = layername)
             except TheTileLeftANote, e:
                 headers = e.headers
                 status_code = e.status_code
@@ -398,12 +398,12 @@ class Layer:
                     lockCoord = self.metatile.firstCoord(coord)
                     
                     # We may need to write a new tile, so acquire a lock.
-                    cache.lock(self, lockCoord, format)
+                    cache.lock(self, lockCoord, format, layername = layername)
                 
                 if not ignore_cached:
                     # There's a chance that some other process has
                     # written the tile while the lock was being acquired.
-                    body = cache.read(self, coord, format)
+                    body = cache.read(self, coord, format, layername = layername)
                     tile_from = 'cache after all'
         
                 if body is None:
@@ -411,7 +411,7 @@ class Layer:
                     buff = StringIO()
 
                     try:
-                        tile = self.render(coord, format)
+                        tile = self.render(coord, format, layer_path_matches)
                         save = True
                     except NoTileLeftBehind, e:
                         tile = e.tile
@@ -431,7 +431,7 @@ class Layer:
                     body = buff.getvalue()
                     
                     if save:
-                        cache.save(body, self, coord, format)
+                        cache.save(body, self, coord, format, layername = layername)
 
                     tile_from = 'layer.render()'
 
@@ -446,9 +446,9 @@ class Layer:
             finally:
                 if lockCoord:
                     # Always clean up a lock when it's no longer being used.
-                    cache.unlock(self, lockCoord, format)
+                    cache.unlock(self, lockCoord, format, layername = layername)
         
-        _addRecentTile(self, coord, format, body)
+        _addRecentTile(self, coord, format, body, layername = layername)
         logging.info('TileStache.Core.Layer.getTileResponse() %s/%d/%d/%d.%s via %s in %.3f', self.name(), coord.zoom, coord.column, coord.row, extension, tile_from, time() - start_time)
         
         return status_code, headers, body
@@ -458,7 +458,7 @@ class Layer:
         """
         return self.metatile.isForReal() and hasattr(self.provider, 'renderArea')
     
-    def render(self, coord, format):
+    def render(self, coord, format, layer_path_matches = None):
         """ Render a tile for a coordinate, return PIL Image-like object.
         
             Perform metatile slicing here as well, if required, writing the
@@ -497,7 +497,8 @@ class Layer:
         elif hasattr(provider, 'renderTile'):
             # draw a single tile
             width, height = self.dim, self.dim
-            tile = provider.renderTile(width, height, srs, coord)
+            print provider
+            tile = provider.renderTile(width, height, srs, coord, layer_path_matches)
 
         else:
             raise KnownUnknown('Your provider lacks renderTile and renderArea methods.')
@@ -534,7 +535,7 @@ class Layer:
                 body = buff.getvalue()
 
                 if self.write_cache:
-                    self.config.cache.save(body, self, other, format)
+                    self.config.cache.save(body, self, other, format, layername = layername)
                 
                 if other == coord:
                     # the one that actually gets returned

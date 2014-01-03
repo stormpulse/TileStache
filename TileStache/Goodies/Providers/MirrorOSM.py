@@ -300,7 +300,7 @@ class Provider:
         else:
             raise KnownUnknown('MirrorOSM only makes .txt and .png tiles, not "%s"' % extension)
 
-    def renderTile(self, width, height, srs, coord):
+    def renderTile(self, width, height, srs, coord, layer_path_matches = None):
         """ Render a single tile, return a ConfirmationResponse instance.
         """
         if coord.zoom < 12:

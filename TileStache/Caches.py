@@ -112,7 +112,7 @@ class Test:
 
         return ' '.join( (name, tile, format) )
     
-    def lock(self, layer, coord, format):
+    def lock(self, layer, coord, format, layername = None):
         """ Pretend to acquire a cache lock for this tile.
         """
         name = self._description(layer, coord, format)
@@ -120,7 +120,7 @@ class Test:
         if self.logfunc:
             self.logfunc('Test cache lock: ' + name)
     
-    def unlock(self, layer, coord, format):
+    def unlock(self, layer, coord, format, layername = None):
         """ Pretend to release a cache lock for this tile.
         """
         name = self._description(layer, coord, format)
@@ -136,7 +136,7 @@ class Test:
         if self.logfunc:
             self.logfunc('Test cache remove: ' + name)
     
-    def read(self, layer, coord, format):
+    def read(self, layer, coord, format, layername = None):
         """ Pretend to read a cached tile.
         """
         name = self._description(layer, coord, format)
@@ -146,7 +146,7 @@ class Test:
 
         return None
     
-    def save(self, body, layer, coord, format):
+    def save(self, body, layer, coord, format, layername = None):
         """ Pretend to save a cached tile.
         """
         name = self._description(layer, coord, format)

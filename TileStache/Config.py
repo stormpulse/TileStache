@@ -212,6 +212,8 @@ def buildConfiguration(config_dict, dirpath='.'):
     cache = _parseConfigfileCache(cache_dict, dirpath)
     
     config = Configuration(cache, dirpath)
+
+    config.debug_responses = config_dict.get('helpful_debug_responses', True)
     
     for (name, layer_dict) in config_dict.get('layers', {}).items():
         config.layers[name] = _parseConfigfileLayer(layer_dict, config, dirpath)

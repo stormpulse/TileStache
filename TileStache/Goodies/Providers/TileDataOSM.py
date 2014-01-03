@@ -232,7 +232,7 @@ class Provider:
     
         return 'text/xml', 'XML'
 
-    def renderTile(self, width, height, srs, coord):
+    def renderTile(self, width, height, srs, coord, layer_path_matches = None):
         """ Render a single tile, return a SaveableResponse instance.
         """
         db = _connect(**self.dbkwargs).cursor()

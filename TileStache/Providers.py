@@ -239,7 +239,7 @@ class Proxy:
 
         return kwargs
 
-    def renderTile(self, width, height, srs, coord):
+    def renderTile(self, width, height, srs, coord, layer_path_matches):
         """
         """
         img = None

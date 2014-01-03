@@ -25,6 +25,7 @@ from wsgiref.headers import Headers
 from urllib import urlopen
 from os import getcwd
 from time import time
+from re import match
 
 import httplib
 import logging
@@ -171,14 +172,15 @@ def requestLayer(config, path_info):
     path_info = '/' + (path_info or '').lstrip('/')
     
     if path_info == '/':
-        return Core.Layer(config, None, None)
+        return Core.Layer(config, None, None), "/", "/", {}
 
     layername = splitPathInfo(path_info)[0]
-    
-    if layername not in config.layers:
-        raise Core.KnownUnknown('"%s" is not a layer I know about. Here are some that I do know about: %s.' % (layername, ', '.join(sorted(config.layers.keys()))))
-    
-    return config.layers[layername]
+
+    for layer_re in config.layers.keys():
+        m = match("^%s$" % layer_re, layername)
+        if m:
+            return config.layers[layer_re], layername, layer_re, m.groupdict()
+    raise Core.KnownUnknown('"%s" is not a layer I know about. Here are some that I do know about: %s.' % (layername, ', '.join(sorted(config.layers.keys()))))
 
 def requestHandler(config_hint, path_info, query_string=None):
     """ Generate a mime-type and response body for a given request.
@@ -215,7 +217,7 @@ def requestHandler2(config_hint, path_info, query_string=None, script_name=''):
         # ensure that path_info is at least a single "/"
         path_info = '/' + (path_info or '').lstrip('/')
         
-        layer = requestLayer(config_hint, path_info)
+        layer, layername, layer_re, layer_path_matches = requestLayer(config_hint, path_info)
         query = parse_qs(query_string or '')
         try:
             callback = query['callback'][0]
@@ -252,7 +254,7 @@ def requestHandler2(config_hint, path_info, query_string=None, script_name=''):
             return 302, headers, 'You are being redirected to %s\n' % redirect_uri
         
         else:
-            status_code, headers, content = layer.getTileResponse(coord, extension)
+            status_code, headers, content = layer.getTileResponse(coord, extension, layername = layername, layer_path_matches = layer_path_matches)
     
         if callback and 'json' in headers['Content-Type']:
             headers['Content-Type'] = 'application/javascript; charset=utf-8'
@@ -266,10 +268,13 @@ def requestHandler2(config_hint, path_info, query_string=None, script_name=''):
     except Core.KnownUnknown, e:
         out = StringIO()
         
-        print >> out, 'Known unknown!'
-        print >> out, e
-        print >> out, ''
-        print >> out, '\n'.join(Core._rummy())
+        if config_hint.debug_responses:
+            print >> out, 'Known unknown!'
+            print >> out, e
+            print >> out, ''
+            print >> out, '\n'.join(Core._rummy())
+        else:
+            print >> out, 'An error has occurred.'
         
         headers['Content-Type'] = 'text/plain'
         status_code, content = 500, out.getvalue()
@@ -369,8 +374,6 @@ class WSGITileServer:
         # WSGI behavior is different from CGI behavior, because we may not want
         # to return a chatty rummy for likely-deployed WSGI vs. testing CGI.
         #
-        if layer and layer not in self.config.layers:
-            return self._response(start_response, 404)
 
         path_info = environ.get('PATH_INFO', None)
         query_string = environ.get('QUERY_STRING', None)
